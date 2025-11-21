@@ -49,96 +49,98 @@
 //     console.log(err, "<<<<<<<<");
 //   });
 
+// app.js (ESM version)
+// Run: npm init -y
+//      npm i express socket.io cors
+// Start: node app.js
 
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import cors from "cors";
 
 const app = express();
-app.use(cors()); // production me restrict origin set karein
+app.use(cors());
 
 // Optional: small health endpoint
-app.get('/', (req, res) => {
-  res.send('WebSocket server running');
+app.get("/", (req, res) => {
+  res.send("WebSocket server running");
 });
 
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: '*', // production me specific origin daalein like "https://yourdomain.com"
-    methods: ['GET', 'POST'],
+    origin: "*", // production me apna domain daalna
+    methods: ["GET", "POST"],
   },
-  // pingInterval/pingTimeout default fine; adjust if needed for cPanel timeouts
 });
 
-// Simple in-memory message history (last 200 messages)
+// Simple history memory
 const MESSAGE_HISTORY_LIMIT = 200;
 let messageHistory = [];
 
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
   console.log(`Client connected: ${socket.id}`);
 
-  // send recent history to new client
-  socket.emit('history', messageHistory);
+  // send recent data
+  socket.emit("history", messageHistory);
 
-  // Join room (if client asks)
-  socket.on('join-room', (room) => {
+  // join room
+  socket.on("join-room", (room) => {
     if (room) {
       socket.join(room);
       console.log(`${socket.id} joined room ${room}`);
     }
   });
 
-  // Handle incoming chat message
-  socket.on('chat-message', (payload) => {
-    // payload should be { text, from, room? }
+  // chat message
+  socket.on("chat-message", (payload) => {
     const msg = {
-      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-      text: payload.text || '',
-      from: payload.from || 'anonymous',
+      id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+      text: payload.text || "",
+      from: payload.from || "anonymous",
       ts: new Date().toISOString(),
       room: payload.room || null,
     };
 
-    // store
     messageHistory.push(msg);
     if (messageHistory.length > MESSAGE_HISTORY_LIMIT) {
       messageHistory.shift();
     }
 
-    // broadcast: if room provided -> to room, else to all
     if (msg.room) {
-      io.to(msg.room).emit('chat-message', msg);
+      io.to(msg.room).emit("chat-message", msg);
     } else {
-      io.emit('chat-message', msg);
+      io.emit("chat-message", msg);
     }
   });
 
-  // Example: typing indicator
-  socket.on('typing', (info) => {
-    // info = { from, room? }
-    if (info && info.room) {
-      socket.to(info.room).emit('typing', info);
+  // typing
+  socket.on("typing", (info) => {
+    if (info?.room) {
+      socket.to(info.room).emit("typing", info);
     } else {
-      socket.broadcast.emit('typing', info);
+      socket.broadcast.emit("typing", info);
     }
   });
 
-  socket.on('disconnect', (reason) => {
-    console.log(`Client disconnected: ${socket.id} — reason: ${reason}`);
+  // disconnect
+  socket.on("disconnect", (reason) => {
+    console.log(`Client disconnected: ${socket.id} — ${reason}`);
   });
 
-  // Optional: handle ping from client for keep-alive
-  socket.on('keepalive', () => {
-    socket.emit('keepalive-ack', { ok: true, ts: new Date().toISOString() });
+  // keepalive
+  socket.on("keepalive", () => {
+    socket.emit("keepalive-ack", {
+      ok: true,
+      ts: new Date().toISOString(),
+    });
   });
 });
 
-// Start server
+// start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
-
